@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EXIF Remover - Secure Metadata Stripper</title>
+    <meta name="description" content="Strip EXIF metadata from images - 100% client-side, no uploads">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+        }
+
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #00d4ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            pointer-events: auto;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 1.5rem;
+        }
+
+        .nav-links li {
+            pointer-events: auto;
+        }
+
+        .nav-links a {
+            color: #b0b0b0;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            padding: 0.3rem 0;
+            position: relative;
+            pointer-events: auto;
+            z-index: 1001;
+            font-size: 0.9rem;
+        }
+
+        .nav-links a:hover { color: #00d4ff; }
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(45deg, #00d4ff, #00ff88);
+            transition: width 0.3s ease;
+        }
+        .nav-links a.active::after { width: 100%; }
+
+        /* ===== COMPACT HERO ===== */
+        .hero {
+            padding: 1.2rem 1.5rem 1rem;
+            text-align: center;
+            background: linear-gradient(135deg, #0f0c29 0%, #1a1430 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at top, rgba(0,0,0,0.2) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: clamp(1.4rem, 4.5vw, 1.8rem);
+            margin-bottom: 0.4rem;
+            background: linear-gradient(45deg, #ffffff, #00d4ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+
+        .hero p {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .tool-section {
+            padding: 1.5rem 1.5rem 1rem;
+        }
+
+        .tool-container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .glass-card {
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+            z-index: 2;
+        }
+
+        .upload-area {
+            border: 2px dashed #3a3a5a;
+            border-radius: 12px;
+            padding: 2rem 1.5rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.04);
+            position: relative;
+            z-index: 1002;
+        }
+
+        .upload-area:hover {
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.07);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 212, 255, 0.2);
+        }
+
+        .upload-area.active {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.07);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 255, 136, 0.2);
+        }
+
+        .upload-area svg {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+            color: #00d4ff;
+            pointer-events: none;
+        }
+
+        .upload-area h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.4rem;
+            color: #fff;
+        }
+
+        .upload-area p {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 0.8rem;
+        }
+
+        .upload-area input { display: none; }
+
+        .file-info {
+            display: none;
+            margin-top: 0.8rem;
+            padding: 0.6rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            font-size: 0.75rem;
+        }
+
+        .file-info span {
+            display: block;
+            margin: 0.2rem 0;
+            color: #a0a0a0;
+        }
+
+        .inspection-card {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1.2rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+            border-radius: 10px;
+            border-left: 3px solid #00d4ff;
+            position: relative;
+            z-index: 1003;
+            pointer-events: auto;
+        }
+
+        .inspection-badge {
+            flex: 1;
+            min-width: 140px;
+            padding: 0.8rem;
+            text-align: center;
+        }
+
+        .inspection-badge h3 {
+            font-size: 0.75rem;
+            color: #888;
+            margin-bottom: 0.4rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .inspection-badge .value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .inspection-badge.original .value { color: #ff6b6b; }
+        .inspection-badge.stripped .value { color: #00ff88; }
+
+        .inspection-badge .label {
+            font-size: 0.65rem;
+            color: #888;
+            margin-top: 0.2rem;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.2rem;
+            margin-top: 1.2rem;
+            align-items: center;
+            position: relative;
+            z-index: 1004;
+            pointer-events: auto;
+        }
+
+        .format-selector, .quality-control { flex: 1; min-width: 160px; }
+        .quality-control { min-width: 200px; }
+
+        .control-label {
+            display: block;
+            margin-bottom: 0.3rem;
+            font-size: 0.8rem;
+            color: #888;
+            font-weight: 500;
+            pointer-events: auto;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            border-radius: 6px;
+            border: 1px solid #3a3a5a;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 0.9rem;
+            pointer-events: auto;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            outline: 2px solid #00d4ff;
+        }
+
+        .quality-value {
+            font-size: 0.85rem;
+            color: #00d4ff;
+            margin-left: 0.4rem;
+            pointer-events: auto;
+        }
+
+        .download-btn {
+            margin-top: 1.2rem;
+            padding: 0.8rem 2.5rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #fff;
+            background: linear-gradient(45deg, #00d4ff, #00ff88);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            opacity: 0.5;
+            pointer-events: none;
+            position: relative;
+            z-index: 1005;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .download-btn.active { opacity: 1; pointer-events: auto; }
+        .download-btn:hover.active { transform: translateY(-1px); }
+
+        .section { padding: 2rem 1.5rem 1.5rem; }
+
+        .section-title { text-align: center; margin-bottom: 2rem; }
+
+        .section-title h2 {
+            font-size: clamp(1.4rem, 5vw, 1.9rem);
+            background: linear-gradient(45deg, #ffffff, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-title p { color: #888; max-width: 500px; margin: 0 auto; }
+
+        .features-grid {
+            max-width: 900px;
+            margin: 2rem auto 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.2rem;
+        }
+
+        .feature-card {
+            padding: 1.5rem;
+            text-align: center;
+            background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+            border-radius: 12px;
+            border-left: 3px solid #00d4ff;
+            transition: all 0.25s ease;
+            pointer-events: auto;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3);
+            border-left-color: #00ff88;
+        }
+
+        .feature-card svg { font-size: 1.8rem; margin-bottom: 0.6rem; color: #00d4ff; pointer-events: none; }
+        .feature-card h3 { color: #fff; margin-bottom: 0.5rem; font-size: 1rem; }
+        .feature-card p { color: #a0a0a0; font-size: 0.85rem; }
+
+        .about-content {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .about-text h3 { color: #00d4ff; margin-bottom: 0.8rem; font-size: 1.25rem; }
+        .about-text h4 { color: #fff; margin: 1.2rem 0 0.5rem; font-size: 0.95rem; }
+        .about-text ul { list-style: none; padding-left: 0; }
+        .about-text li { padding: 0.5rem 0; padding-left: 1.3rem; position: relative; margin-bottom: 0.5rem; }
+        .about-text li::before { content: '✓'; position: absolute; left: 0; color: #00ff88; font-weight: bold; }
+
+        .about-image { text-align: center; }
+        .about-image svg { font-size: 5.5rem; color: rgba(0, 212, 255, 0.15); pointer-events: none; }
+
+        .workflow { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .workflow-step { text-align: center; padding: 1.5rem 0.8rem; background: rgba(255,255,255,0.03); border-radius: 10px; border-left: 3px solid #00d4ff; pointer-events: auto; }
+        .step-number { width: 45px; height: 45px; margin: 0 auto 0.7rem; background: linear-gradient(45deg, #00d4ff, #00ff88); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem; color: #000; }
+        .workflow-step h4 { margin-bottom: 0.4rem; color: #fff; font-size: 0.95rem; }
+        .workflow-step p { color: #888; font-size: 0.75rem; }
+
+        .privacy-content { max-width: 700px; margin: 0 auto; padding: 1rem; }
+        .privacy-content p { text-align: center; margin-bottom: 1.2rem; color: #a0a0a0; font-size: 0.9rem; }
+        .privacy-content ul { list-style: none; padding: 0; }
+        .privacy-content li { padding: 0.8rem; margin: 0.5rem 0; background: rgba(255,255,255,0.035); border-radius: 8px; border-left: 3px solid #00d4ff; pointer-events: auto; }
+        .privacy-content li strong { color: #00ff88; display: block; margin-bottom: 0.2rem; }
+        .privacy-content li p { color: #a0a0a0; font-size: 0.8rem; margin: 0; }
+
+        .contact-card { max-width: 500px; margin: 0 auto; }
+        .contact-form { display: flex; flex-direction: column; gap: 1rem; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { margin-bottom: 0.3rem; color: #888; font-size: 0.8rem; pointer-events: auto; }
+        .form-group input, .form-group textarea { padding: 0.8rem; border-radius: 6px; border: 1px solid #3a3a5a; background: rgba(255,255,255,0.05); color: #fff; font-size: 0.95rem; resize: vertical; pointer-events: auto; }
+        .form-group input:focus, .form-group textarea:focus { outline: none; outline: 2px solid #00d4ff; }
+        .form-group textarea { min-height: 80px; }
+        .send-btn { padding: 0.8rem 2rem; font-size: 0.95rem; font-weight: 600; color: #fff; background: linear-gradient(45deg, #00d4ff, #00ff88); border: none; border-radius: 10px; cursor: pointer; transition: all 0.25s ease; pointer-events: auto; }
+        .send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0, 212, 255, 0.4); }
+
+        .faq-section { max-width: 700px; margin: 0 auto; }
+        .faq-item { margin-bottom: 1rem; padding: 1rem; background: rgba(255,255,255,0.035); border-radius: 10px; border-left: 3px solid #00d4ff; transition: all 0.2s ease; pointer-events: auto; }
+        .faq-item:hover { transform: translateX(4px); box-shadow: 0 4px 15px rgba(0, 212, 255, 0.15); }
+        .faq-question { font-weight: 600; color: #fff; margin-bottom: 0.4rem; font-size: 0.95rem; }
+        .faq-answer { color: #a0a0a0; font-size: 0.85rem; line-height: 1.5; }
+
+        footer { text-align: center; padding: 1rem; color: #666; font-size: 0.8rem; }
+        footer a { color: #00d4ff; text-decoration: none; }
+
+        .section { display: none; }
+        .section.active { display: block; }
+        #home.active { display: block; }
+
+        @media (max-width: 768px) {
+            .nav-container { flex-direction: column; gap: 0.5rem; padding: 0.5rem 1rem; }
+            .nav-links { gap: 1rem; }
+            .inspection-card { flex-direction: column; }
+            .controls { flex-direction: column; }
+            .about-content { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== NAVIGATION BAR ===== -->
+    <nav>
+        <div class="nav-container">
+            <div class="logo">EXIF Remover</div>
+            <ul class="nav-links">
+                <li><a href="#" class="nav-link active" data-section="home">Tool</a></li>
+                <li><a href="#" class="nav-link" data-section="about">About</a></li>
+                <li><a href="#" class="nav-link" data-section="how-it-works">How It Works</a></li>
+                <li><a href="#" class="nav-link" data-section="privacy">Privacy</a></li>
+                <li><a href="#" class="nav-link" data-section="contact">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- ===== COMPACT HERO SECTION ===== -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>EXIF Remover</h1>
+            <p>Secure, client-side metadata stripper.</p>
+        </div>
+    </section>
+
+    <!-- ===== HOME/TOOL SECTION ===== -->
+    <section id="home" class="section active">
+        <div class="tool-container">
+            <div class="glass-card">
+                <div class="upload-area" id="uploadArea">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7,10 12,15 17,10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <h3>Upload Image</h3>
+                    <p>JPEG, PNG, WebP files supported</p>
+                    <input type="file" id="fileInput" accept="image/*">
+                    <div class="file-info" id="fileInfo"></div>
+                </div>
+            </div>
+
+            <div class="inspection-card" id="inspectionCard" style="display: none;">
+                <div class="inspection-badge original">
+                    <h3>Original</h3>
+                    <div class="value" id="originalSize">0 KB</div>
+                    <div class="label">File Size</div>
+                </div>
+                <div style="font-size: 1.5rem; color: #3a3a5a;">→</div>
+                <div class="inspection-badge stripped">
+                    <h3>Stripped</h3>
+                    <div class="value" id="strippedSize">0 KB</div>
+                    <div class="label">Clean Image</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <div class="format-selector">
+                    <label for="format">Format</label>
+                    <select id="format">
+                        <option value="jpeg">JPEG</option>
+                        <option value="png">PNG</option>
+                        <option value="webp">WebP</option>
+                    </select>
+                </div>
+                <div class="quality-control">
+                    <label for="quality">Quality: <span class="quality-value" id="qualityValue">95%</span></label>
+                    <input type="range" id="quality" min="1" max="100" value="95">
+                </div>
+            </div>
+
+            <button class="download-btn active" id="downloadBtn" onclick="downloadStrippedFile()">
+                Download Clean File
+            </button>
+        </div>
+    </section>
+
+    <!-- ===== KEY FEATURES ===== -->
+    <section class="section" style="padding-top: 0;">
+        <div class="tool-container">
+            <div class="section-title">
+                <h2>Key Features</h2>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s5-4 5-9V5a3 3 0 0 0-3-3v0"/>
+                        <path d="M3 12h18"/>
+                        <path d="M12 2a14.5 14.5 0 0 1 0 20"/>
+                    </svg>
+                    <h3>100% Private</h3>
+                    <p>Your files never leave your device. All processing is local.</p>
+                </div>
+                <div class="feature-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 3v18h18V3H3z"/>
+                        <circle cx="12" cy="9" r="2"/>
+                        <path d="M12 15c.5-2 3-3 5-3"/>
+                    </svg>
+                    <h3>No Data Logging</h3>
+                    <p>No tracking, no storage, no analytics - just a simple tool.</p>
+                </div>
+                <div class="feature-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 3 12"/>
+                    </svg>
+                    <h3>Fast & Free</h3>
+                    <p>Instant results. Your security, every time.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== ABOUT SECTION ===== -->
+    <section id="about" class="section">
+        <div class="tool-container">
+            <div class="section-title">
+                <h2>About</h2>
+                <p>Understanding EXIF metadata and why removing it matters for privacy</p>
+            </div>
+            <div class="about-content">
+                <div class="about-text">
+                    <h3>What is EXIF Metadata?</h3>
+                    <p>EXIF (Exchangeable Image File Format) stores metadata alongside your photos - not just pixels, but valuable information about the image.</p>
+
+                    <h4>Types of EXIF Data:</h4>
+                    <ul>
+                        <li><strong>GPS Location</strong> - Exact location where the photo was taken</li>
+                        <li><strong>Camera Info</strong> - Brand, model, serial number, settings used</li>
+                        <li><strong>Timestamps</strong> - Date and time of capture</li>
+                        <li><strong>Technical Details</strong> - Aperture, shutter speed, ISO, focal length</li>
+                        <li><strong>Artist Info</strong> - Copyright, photographer name</li>
+                    </ul>
+                </div>
+                <div class="about-image">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="9" cy="9" r="2"/>
+                        <path d="M5 15h14"/>
+                        <path d="M5 11h14"/>
+                        <path d="M9 17h1v-4h-1v4z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== HOW IT WORKS SECTION ===== -->
+    <section id="how-it-works" class="section">
+        <div class="tool-container">
+            <div class="section-title">
+                <h2>How It Works</h2>
+                <p>Simple, secure, and straightforward</p>
+            </div>
+            <div class="workflow">
+                <div class="workflow-step">
+                    <div class="step-number">1</div>
+                    <h4>Upload Image</h4>
+                    <p>Select any image file from your device or drag it here.</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">2</div>
+                    <h4>Strip Metadata</h4>
+                    <p>Your file is processed locally using Canvas API in your browser.</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">3</div>
+                    <h4>Download Clean File</h4>
+                    <p>Get your privacy-protected image instantly.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== PRIVACY SECTION ===== -->
+    <section id="privacy" class="section">
+        <div class="tool-container">
+            <div class="section-title">
+                <h2>Privacy</h2>
+                <p>Your privacy is our priority</p>
+            </div>
+            <div class="privacy-content">
+                <p><strong>Your files never leave your device.</strong> This is a client-side web application that processes everything locally in your browser.</p>
+
+                <ul>
+                    <li>
+                        <strong>Zero Server Uploads:</strong> All processing happens in your browser. We cannot upload files anywhere.
+                    </li>
+                    <li>
+                        <strong>No Data Collection:</strong> We don't track, store, or analyze any images or metadata.
+                    </li>
+                    <li>
+                        <strong>Local Processing Only:</strong> Canvas API and File API are used entirely within your browser.
+                    </li>
+                    <li>
+                        <strong>Complete Anonymity:</strong> No IP addresses, no cookies, no analytics.
+                    </li>
+                </ul>
+
+                <p style="margin-top: 1rem; padding: 0.7rem; background: rgba(255,255,255,0.03); border-radius: 8px;">
+                    <strong>Security Note:</strong> Processing is completely offline. Run locally without internet.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== CONTACT SECTION ===== -->
+    <section id="contact" class="section">
+        <div class="tool-container">
+            <div class="section-title">
+                <h2>Contact</h2>
+                <p>We'd love to hear your feedback</p>
+            </div>
+            <div class="contact-card">
+                <div class="glass contact-form">
+                    <div class="form-group">
+                        <label for="name">Name</label>
+                        <input type="text" id="name" placeholder="Your name (optional)">
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" placeholder="Your email address">
+                    </div>
+                    <div class="form-group">
+                        <label for="message">Message</label>
+                        <textarea id="message" placeholder="How can we help you?"></textarea>
+                    </div>
+                    <button class="send-btn" onclick="submitContact()">Send Message</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FAQ SECTION ===== -->
+    <section id="faq" class="section">
+        <div class="tool-container">
+            <div class="faq-section">
+                <div class="section-title">
+                    <h2>FAQ</h2>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Does this affect image quality?</div>
+                    <div class="faq-answer">No. When using JPEG, adjust the quality slider 1-100%. PNG and WebP have no quality loss.</div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Does it work on mobile and desktop?</div>
+                    <div class="faq-answer">Yes! This app is responsive and works on all device sizes - mobile, tablet, and desktop.</div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Will my EXIF data be removed?</div>
+                    <div class="faq-answer">Yes. After processing, all metadata (GPS, camera info, timestamps, etc.) is removed.</div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Can I use it offline?</div>
+                    <div class="faq-answer">Absolutely! Save the file and run it locally offline.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer>
+        <p>EXIF Remover - Your Privacy Tools</p>
+        <p>Made with ❤️ in your browser</p>
+    </footer>
+
+    <script>
+        // SECTION SWITCHING
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            const targetSection = document.getElementById(sectionId);
+            if (targetSection) {
+                targetSection.classList.add('active');
+            }
+        }
+
+        // NAVIGATION HANDLING
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+                const sectionId = this.getAttribute('data-section');
+                showSection(sectionId);
+                window.history.pushState(null, '', '#' + sectionId);
+                document.getElementById('inspectionCard').style.display = 'none';
+                document.getElementById('downloadBtn').classList.remove('active');
+                document.getElementById('uploadArea').classList.remove('active');
+                document.getElementById('fileInput').value = '';
+                document.getElementById('fileInfo').style.display = 'none';
+                setTimeout(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, 50);
+            });
+        });
+
+        // CHECK URL HASH ON LOAD
+        window.addEventListener('DOMContentLoaded', function() {
+            const hash = window.location.hash.substring(1);
+            if (hash && document.getElementById(hash)) {
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                const targetLink = document.querySelector(`.nav-link[data-section="${hash}"]`);
+                if (targetLink) targetLink.classList.add('active');
+                document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
+                const targetSection = document.getElementById(hash);
+                if (targetSection) targetSection.classList.add('active');
+            }
+        });
+
+        // FILE UPLOAD HANDLING
+        let originalFile, originalSize, strippedBlob;
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('active'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('active'));
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('active');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) { alert('Please select an image file!'); return; }
+            originalFile = file;
+            originalSize = file.size;
+            fileInfo.innerHTML = `<strong>Selected:</strong> ${file.name}<br><span>Size: ${(file.size/1024).toFixed(2)} KB</span><span>Type: ${file.type}</span>`;
+            fileInfo.style.display = 'block';
+            processFile(file);
+        }
+
+        function processFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    const format = document.getElementById('format').value;
+                    const quality = format === 'jpeg' ? document.getElementById('quality').value / 100 : undefined;
+                    canvas.toBlob((blob) => {
+                        strippedBlob = blob;
+                        document.getElementById('originalSize').textContent = `${(originalSize/1024).toFixed(2)} KB`;
+                        document.getElementById('strippedSize').textContent = `${(blob.size/1024).toFixed(2)} KB`;
+                        document.getElementById('inspectionCard').style.display = 'flex';
+                        document.getElementById('downloadBtn').classList.add('active');
+                    }, format, quality);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        document.getElementById('format').addEventListener('change', function() {
+            if (strippedBlob && originalFile) processFile(originalFile);
+        });
+
+        const qualitySlider = document.getElementById('quality');
+        const qualityValue = document.getElementById('qualityValue');
+        qualitySlider.addEventListener('input', () => { qualityValue.textContent = `${qualitySlider.value}%`; });
+        qualitySlider.addEventListener('change', function() { if (strippedBlob && originalFile) processFile(originalFile); });
+
+        function downloadStrippedFile() {
+            if (!strippedBlob) { alert('Please upload an image first!'); return; }
+            const format = document.getElementById('format').value;
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(strippedBlob);
+            a.download = originalFile.name.replace(/\.[^/.]+$/, '') + '_clean.' + format;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function submitContact() {
+            const email = document.getElementById('email').value.trim();
+            if (!email) { alert('Please enter your email address.'); return; }
+            alert('Thank you! This is a client-side demo - messages cannot be sent. Privacy is protected.');
+            document.getElementById('name').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('message').value = '';
+        }
+    </script>
+</body>
+</html>
